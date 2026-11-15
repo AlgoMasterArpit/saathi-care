@@ -6,6 +6,7 @@ import {
   describeDays,
   field,
   formError,
+  formatDate,
   formatDateTime,
   formatTime,
   h,
@@ -210,50 +211,52 @@ function pulseCard(pulse) {
   );
 }
 
+function doseItem(dose, ctx, tz, withDate = false) {
+  const when = withDate ? `${formatDate(dose.date)}, ${clock12(dose.time)}` : clock12(dose.time);
+  const takeBtn = h('button', { type: 'button', class: 'btn btn-take', 'aria-pressed': String(dose.status === 'taken'), 'data-key': `take-${dose.key}` }, icon('check'), 'Taken');
+  const skipBtn = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-pressed': String(dose.status === 'skipped'), 'data-key': `skip-${dose.key}` }, 'Skip');
+  takeBtn.setAttribute('aria-label', `Mark ${dose.name} on ${when} as taken`);
+  skipBtn.setAttribute('aria-label', `Mark ${dose.name} on ${when} as skipped`);
+  const item = h(
+    'li',
+    { class: `dose dose-${dose.status}` },
+    h('p', { class: 'dose-time' }, when),
+    h(
+      'div',
+      { class: 'dose-main' },
+      h('p', { class: 'dose-name' }, dose.name, ' ', h('span', { class: 'dose-dosage' }, dose.dosage)),
+      dose.instructions ? h('p', { class: 'muted' }, dose.instructions) : null,
+      h(
+        'p',
+        { class: 'dose-status' },
+        statusBadge(dose.status),
+        dose.loggedBy ? h('span', { class: 'muted' }, ` by ${dose.loggedBy}${dose.loggedAt ? ` at ${formatTime(dose.loggedAt, tz)}` : ''}`) : null,
+      ),
+    ),
+    h('div', { class: 'dose-actions' }, takeBtn, skipBtn),
+  );
+  takeBtn.addEventListener('click', () => run(takeBtn, async () => {
+    await api.logDose(dose.key, 'taken');
+    if (dose.status !== 'taken' && !prefersReducedMotion()) {
+      item.classList.add('dose-celebrate');
+      await wait(650);
+    }
+    await ctx.refresh();
+  }, `${dose.name} marked as taken`));
+  skipBtn.addEventListener('click', () => run(skipBtn, async () => {
+    await api.logDose(dose.key, 'skipped');
+    await ctx.refresh();
+  }, `${dose.name} marked as skipped`));
+  return item;
+}
+
 export function renderToday(data, ctx) {
   const { elder, me, pulse, today, settings } = data;
   const tz = elder.timezone;
   const isElder = me.role === 'elder';
 
-  const doseItems = today.doses.map((dose) => {
-    const takeBtn = h('button', { type: 'button', class: 'btn btn-take', 'aria-pressed': String(dose.status === 'taken'), 'data-key': `take-${dose.key}` }, icon('check'), 'Taken');
-    const skipBtn = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-pressed': String(dose.status === 'skipped'), 'data-key': `skip-${dose.key}` }, 'Skip');
-    const label = `${dose.name} at ${clock12(dose.time)}`;
-    takeBtn.setAttribute('aria-label', `Mark ${label} as taken`);
-    skipBtn.setAttribute('aria-label', `Mark ${label} as skipped`);
-    const item = h(
-      'li',
-      { class: `dose dose-${dose.status}` },
-      h('p', { class: 'dose-time' }, clock12(dose.time)),
-      h(
-        'div',
-        { class: 'dose-main' },
-        h('p', { class: 'dose-name' }, dose.name, ' ', h('span', { class: 'dose-dosage' }, dose.dosage)),
-        dose.instructions ? h('p', { class: 'muted' }, dose.instructions) : null,
-        h(
-          'p',
-          { class: 'dose-status' },
-          statusBadge(dose.status),
-          dose.loggedBy ? h('span', { class: 'muted' }, ` by ${dose.loggedBy}${dose.loggedAt ? ` at ${formatTime(dose.loggedAt, tz)}` : ''}`) : null,
-        ),
-      ),
-      h('div', { class: 'dose-actions' }, takeBtn, skipBtn),
-    );
-    takeBtn.addEventListener('click', () => run(takeBtn, async () => {
-      await api.logDose(dose.key, 'taken');
-      if (dose.status !== 'taken' && !prefersReducedMotion()) {
-        item.classList.add('dose-celebrate');
-        await wait(650);
-      }
-      await ctx.refresh();
-    }, `${dose.name} marked as taken`));
-    skipBtn.addEventListener('click', () => run(skipBtn, async () => {
-      await api.logDose(dose.key, 'skipped');
-      await ctx.refresh();
-    }, `${dose.name} marked as skipped`));
-    return item;
-  });
-
+  const doseItems = today.doses.map((dose) => doseItem(dose, ctx, tz));
+  const earlierItems = (data.earlier ?? []).map((dose) => doseItem(dose, ctx, tz, true));
   const next = data.appointments.find((a) => Date.parse(a.startsAt) > Date.now());
 
   return h(
@@ -284,6 +287,15 @@ export function renderToday(data, ctx) {
       h('h2', { id: 'today-title' }, "Today's medicines"),
       doseItems.length ? h('ol', { class: 'dose-list' }, doseItems) : h('p', { class: 'muted' }, 'No medicines scheduled today.'),
     ),
+    earlierItems.length
+      ? h(
+          'section',
+          { class: 'card', 'aria-labelledby': 'earlier-title' },
+          h('h2', { id: 'earlier-title' }, 'Missed in the last 2 days'),
+          h('p', { class: 'muted' }, 'Took it but forgot to tap? Mark it here. The record and the stock count are corrected.'),
+          h('ol', { class: 'dose-list' }, earlierItems),
+        )
+      : null,
   );
 }
 
