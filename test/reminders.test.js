@@ -68,6 +68,25 @@ describe('reminder planning', () => {
     assert.equal(plan.key, 'refill:med_0:2');
   });
 
+  it('emails the elder once when someone proposes a medicine or a change', () => {
+    const now = istDate('2026-11-15', '12:00');
+    const circle = makeCircle({
+      now,
+      medications: [
+        { name: 'Vitamin B12', dosage: '1500 mcg', times: ['08:30'], status: 'pending', createdByName: 'Arjun Rao', createdAt: now.toISOString() },
+        { name: 'Statin', times: ['22:00'], proposal: { type: 'remove', patch: {}, byName: 'Nurse Joy', at: now.toISOString() } },
+      ],
+    });
+    const approvals = planReminders(circle, now).filter((p) => p.kind === 'approval-needed');
+    assert.deepEqual(approvals.map((p) => p.roles), [['elder'], ['elder']]);
+    assert.equal(approvals[0].subject, 'Your yes is needed: Arjun Rao wants to add Vitamin B12 1500 mcg');
+    assert.equal(approvals[1].subject, 'Your yes is needed: Nurse Joy wants to stop Statin');
+    assert.match(approvals[0].text, /Nothing changes on your medicine list until you say yes/);
+
+    for (const plan of approvals) circle.notified[plan.key] = now.toISOString();
+    assert.equal(planReminders(circle, now).filter((p) => p.kind === 'approval-needed').length, 0);
+  });
+
   it('only emails members who opted in', () => {
     const circle = makeCircle();
     circle.members[2].notify = false;
