@@ -14,7 +14,10 @@ const TABS = [
   { id: 'activity', label: 'Activity', short: 'Activity', icon: 'bell', render: renderActivity },
 ];
 const ROLE_LABEL = { elder: 'Elder', caretaker: 'Caretaker', family: 'Family' };
-const REFRESH_MS = 60_000;
+const REFRESH_MS = 15_000;
+
+const awaitingDecision = (data) =>
+  data?.me.can.approve ? data.medications.filter((m) => m.status === 'pending' || m.proposal) : [];
 
 const main = document.getElementById('main');
 const nav = document.getElementById('app-nav');
@@ -121,6 +124,7 @@ function go(id, { focusTab = false } = {}) {
 }
 
 async function refresh() {
+  const known = state.data ? new Set(awaitingDecision(state.data).map((m) => `${m.id}:${m.proposal?.at ?? ''}`)) : null;
   try {
     state.data = await api.circle();
   } catch (error) {
@@ -129,6 +133,12 @@ async function refresh() {
   }
   renderHeader();
   if (!document.querySelector('dialog[open]')) renderPanel();
+  const arrived = known ? awaitingDecision(state.data).filter((m) => !known.has(`${m.id}:${m.proposal?.at ?? ''}`)) : [];
+  if (arrived.length) {
+    const [first] = arrived;
+    const who = first.status === 'pending' ? first.createdByName : first.proposal.byName;
+    toast(arrived.length === 1 ? `${who ?? 'Someone'} sent ${first.name} for your approval` : `${arrived.length} medicine changes are waiting for your approval`);
+  }
 }
 
 function startPolling() {
@@ -197,6 +207,9 @@ window.addEventListener('hashchange', () => {
 });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && state.data) refresh();
+});
+window.addEventListener('focus', () => {
+  if (state.data) refresh();
 });
 
 setupDisplayControls();
