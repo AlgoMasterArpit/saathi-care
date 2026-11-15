@@ -68,6 +68,18 @@ export function planReminders(circle, now) {
   }
 
   for (const med of circle.medications) {
+    const isNew = med.status === 'pending';
+    if (!isNew && !med.proposal) continue;
+    const who = (isNew ? med.createdByName : med.proposal.byName) ?? 'Someone in your circle';
+    const what = isNew ? `add ${med.name} ${med.dosage ?? ''}`.trim() : med.proposal.type === 'remove' ? `stop ${med.name}` : `change ${med.name}`;
+    add(`approve:${med.id}:${isNew ? med.createdAt : med.proposal.at}`, 'approval-needed', ['elder'], `Your yes is needed: ${who} wants to ${what}`, [
+      `Hello ${elderName},`,
+      `${who} would like to ${what}.`,
+      'Nothing changes on your medicine list until you say yes. Open Saathi and tap Approve or Decline.',
+    ]);
+  }
+
+  for (const med of circle.medications) {
     if (med.status !== 'active') continue;
     const refill = refillStatus(med);
     if (refill?.low) {
