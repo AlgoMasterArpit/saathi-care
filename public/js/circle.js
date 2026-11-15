@@ -1,5 +1,6 @@
 import { api } from './api.js';
 import { run, viewHeading } from './care.js';
+import { icon } from './icons.js';
 import { busy, describeDays, clock12, field, formError, formatDate, formatDateTime, h, nextId, openDialog, toast, validateForm } from './dom.js';
 
 const ROLE_LABEL = { elder: 'Elder', caretaker: 'Caretaker', family: 'Family' };
@@ -27,7 +28,7 @@ function briefPanel() {
   const langId = nextId('lang');
   const language = h('select', { id: langId }, h('option', { value: 'en' }, 'English'), h('option', { value: 'hi', lang: 'hi' }, 'हिन्दी (Hindi)'));
   const output = h('div', { class: 'brief-output', 'aria-live': 'polite' });
-  const button = h('button', { type: 'button', class: 'btn btn-primary' }, '✨ Write this week’s brief');
+  const button = h('button', { type: 'button', class: 'btn btn-primary' }, icon('sparkles'), 'Write this week’s brief');
   button.addEventListener('click', async () => {
     output.setAttribute('aria-busy', 'true');
     output.replaceChildren(h('p', { class: 'muted' }, 'Gemini is reading this week’s care record…'));
@@ -68,15 +69,18 @@ export function renderInsights(data) {
   const chart = h(
     'ol',
     { class: 'chart', 'aria-hidden': 'true' },
-    adherence.daily.map((day) => {
+    adherence.daily.map((day, index) => {
       const col = h('span', { class: 'chart-fill' });
-      col.style.height = `${day.rate ?? 0}%`;
+      col.style.height = `${Math.max(day.rate ?? 0, day.total ? 4 : 0)}%`;
+      const isToday = index === adherence.daily.length - 1;
+      const tone = day.rate !== null && day.rate < 60 ? 'bar-low' : day.rate !== null && day.rate < 85 ? 'bar-mid' : '';
       return h(
         'li',
-        { class: `chart-col ${day.rate !== null && day.rate < 60 ? 'bar-low' : day.rate !== null && day.rate < 85 ? 'bar-mid' : ''}` },
+        { class: `chart-col ${tone} ${isToday ? 'chart-today' : ''}`.trim() },
         h('span', { class: 'chart-value' }, day.rate === null ? '—' : `${day.rate}%`),
         h('span', { class: 'chart-track' }, col),
-        h('span', { class: 'chart-label' }, formatDate(day.date).split(',')[0]),
+        h('span', { class: 'chart-count' }, day.total ? `${day.taken}/${day.total}` : ''),
+        h('span', { class: 'chart-label' }, isToday ? 'Today' : formatDate(day.date).split(',')[0]),
       );
     }),
   );
@@ -325,7 +329,7 @@ export function renderCircle(data, ctx) {
       toast(error.message);
     }
   });
-  const testBtn = h('button', { type: 'button', class: 'btn btn-secondary' }, '✉️ Send me a test email');
+  const testBtn = h('button', { type: 'button', class: 'btn btn-secondary' }, icon('mail'), 'Send me a test email');
   testBtn.addEventListener('click', async () => {
     try {
       const result = await busy(testBtn, () => api.testEmail());
@@ -348,7 +352,7 @@ export function renderCircle(data, ctx) {
     h(
       'section',
       { class: 'card', 'aria-labelledby': 'profile-title' },
-      h('div', { class: 'section-head' }, h('h2', { id: 'profile-title' }, `${elder.name}'s profile`), h('div', { class: 'actions' }, editProfile, h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => printCard(data) }, '🖨 Print emergency card'))),
+      h('div', { class: 'section-head' }, h('h2', { id: 'profile-title' }, `${elder.name}'s profile`), h('div', { class: 'actions' }, editProfile, h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => printCard(data) }, icon('printer'), 'Print emergency card'))),
       h(
         'dl',
         { class: 'details' },
@@ -423,7 +427,7 @@ export function renderActivity(data) {
                     h('td', {}, KIND_LABEL[mail.kind] ?? mail.kind),
                     h('td', {}, mail.subject),
                     h('td', {}, mail.to?.length ? mail.to.join(', ') : '—'),
-                    h('td', {}, mail.delivered ? h('span', { class: 'badge badge-taken' }, '✓ Emailed') : h('span', { class: 'badge badge-upcoming' }, '○ Logged')),
+                    h('td', {}, mail.delivered ? h('span', { class: 'badge badge-taken' }, icon('check'), 'Emailed') : h('span', { class: 'badge badge-upcoming' }, icon('circle'), 'Logged')),
                   ),
                 ),
               ),
