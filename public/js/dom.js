@@ -159,30 +159,7 @@ export function ring(percent, { label, big, small, size = 120, stroke = 12, tone
 
 export const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
-export function formatTime(iso, timeZone) {
-  return new Intl.DateTimeFormat('en-IN', { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
-}
-
-export function formatDateTime(iso, timeZone) {
-  return new Intl.DateTimeFormat('en-IN', { timeZone, weekday: 'short', day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
-}
-
-export function formatDate(dateStr) {
-  return new Intl.DateTimeFormat('en-IN', { timeZone: 'UTC', weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(`${dateStr}T00:00:00Z`));
-}
-
-export const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-
-export function describeDays(days) {
-  if (!days?.length || days.length === 7) return 'Every day';
-  return [...days].sort((a, b) => a - b).map((d) => WEEKDAYS[d]).join(', ');
-}
-
-export function clock12(time) {
-  const [hours, minutes] = time.split(':').map(Number);
-  const suffix = hours >= 12 ? 'PM' : 'AM';
-  return `${hours % 12 || 12}:${String(minutes).padStart(2, '0')} ${suffix}`;
-}
+export { WEEKDAYS, clock12, describeDays, formatDate, formatDateTime, formatTime } from './format.js';
 
 const PREFS_KEY = 'saathi.display';
 

@@ -16,6 +16,7 @@ import {
   toast,
   validateForm,
 } from './dom.js';
+import { googleCalendarUrl, googleMapsUrl, untilText } from './format.js';
 import { icon } from './icons.js';
 
 const STATUS = {
@@ -62,14 +63,6 @@ export function decisionButtons(med, ctx) {
     await ctx.refresh();
   }, `${med.name} declined`));
   return [approve, decline];
-}
-
-function untilText(ms) {
-  const minutes = Math.max(1, Math.round(ms / 60_000));
-  if (minutes < 60) return `${minutes} min`;
-  const hours = Math.floor(minutes / 60);
-  const rest = minutes % 60;
-  return rest ? `${hours} h ${rest} m` : `${hours} h`;
 }
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -555,19 +548,6 @@ function appointmentForm(ctx, initial = {}, id = null) {
   return form;
 }
 
-function calendarLink(appointment, elderName) {
-  const stamp = (ms) => new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
-  const start = Date.parse(appointment.startsAt);
-  const params = new URLSearchParams({
-    action: 'TEMPLATE',
-    text: `${elderName}: ${appointment.doctor}`,
-    dates: `${stamp(start)}/${stamp(start + 3_600_000)}`,
-    details: [appointment.notes, ...(appointment.questions ?? []).map((q) => `• ${q}`)].filter(Boolean).join('\n'),
-    location: appointment.location ?? '',
-  });
-  return `https://calendar.google.com/calendar/render?${params}`;
-}
-
 function appointmentCard(appointment, data, ctx, past) {
   const tz = data.elder.timezone;
   const edit = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-label': `Edit appointment with ${appointment.doctor}` }, 'Edit');
@@ -582,10 +562,10 @@ function appointmentCard(appointment, data, ctx, past) {
   });
   const links = [];
   if (appointment.location) {
-    links.push(h('a', { class: 'btn btn-link', href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appointment.location)}`, target: '_blank', rel: 'noopener noreferrer' }, icon('pin'), 'Open in Google Maps', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
+    links.push(h('a', { class: 'btn btn-link', href: googleMapsUrl(appointment.location), target: '_blank', rel: 'noopener noreferrer' }, icon('pin'), 'Open in Google Maps', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
   }
   if (!past) {
-    links.push(h('a', { class: 'btn btn-link', href: calendarLink(appointment, data.elder.name), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), 'Add to Google Calendar', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
+    links.push(h('a', { class: 'btn btn-link', href: googleCalendarUrl(appointment, data.elder.name), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), 'Add to Google Calendar', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
   }
   return h(
     'li',
