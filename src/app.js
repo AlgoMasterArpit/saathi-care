@@ -66,10 +66,9 @@ export function createApp({ logger = silentLogger, ...deps }) {
 
   app.use(
     express.static(PUBLIC_DIR, {
-      maxAge: '1h',
       index: 'index.html',
       setHeaders: (res, filePath) => {
-        if (filePath.endsWith('.html')) res.set('Cache-Control', 'no-cache');
+        res.set('Cache-Control', /\.(svg|webmanifest|txt)$/.test(filePath) ? 'public, max-age=86400' : 'no-cache');
       },
     }),
   );
