@@ -1,0 +1,34 @@
+{
+  "name": "saathi-care",
+  "version": "1.0.0",
+  "description": "Elder-first care circle: medications, appointments and adherence shared with family and caretakers, with proactive email reminders and Gemini assistance.",
+  "type": "module",
+  "main": "src/server.js",
+  "engines": {
+    "node": ">=20.6"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --env-file-if-exists=.env --watch src/server.js",
+    "test": "node --test --test-reporter=spec",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
+    "lint": "eslint ."
+  },
+  "license": "MIT",
+  "author": "Arpit Tyagi",
+  "dependencies": {
+    "@google-cloud/firestore": "^9.4.1",
+    "@google/genai": "^3.3.0",
+    "compression": "^1.8.2",
+    "express": "^5.3.0",
+    "express-rate-limit": "^8.7.4",
+    "helmet": "^8.3.0",
+    "nodemailer": "^10.5.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0"
+  }
+}
