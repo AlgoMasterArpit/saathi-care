@@ -1,3 +1,5 @@
+import { icon, ringSvg } from './icons.js';
+
 const PROPS = new Set(['value', 'checked', 'selected', 'disabled', 'hidden', 'required', 'multiple', 'open']);
 
 export function h(tag, attrs = {}, ...children) {
@@ -117,7 +119,7 @@ export function openDialog({ title, content, onClose }) {
       'div',
       { class: 'dialog-head' },
       h('h2', { id: headingId }, title),
-      h('button', { type: 'button', class: 'btn btn-ghost icon-btn', 'aria-label': 'Close', onclick: () => dialog.close() }, '✕'),
+      h('button', { type: 'button', class: 'btn btn-ghost icon-btn', 'aria-label': 'Close', onclick: () => dialog.close() }, icon('x')),
     ),
     h('div', { class: 'dialog-body' }, content),
   );
@@ -133,18 +135,29 @@ export function openDialog({ title, content, onClose }) {
 }
 
 export async function busy(button, task) {
-  const label = button.textContent;
+  const content = [...button.childNodes];
   button.disabled = true;
   button.setAttribute('aria-busy', 'true');
-  button.textContent = 'Please wait…';
+  button.replaceChildren(h('span', { class: 'spinner', 'aria-hidden': 'true' }), 'Please wait…');
   try {
     return await task();
   } finally {
     button.disabled = false;
     button.removeAttribute('aria-busy');
-    button.textContent = label;
+    button.replaceChildren(...content);
   }
 }
+
+export function ring(percent, { label, big, small, size = 120, stroke = 12, tone = 'ok' }) {
+  return h(
+    'div',
+    { class: 'ring', role: 'img', 'aria-label': label },
+    ringSvg(percent, { size, stroke, tone }),
+    h('span', { class: 'ring-center', 'aria-hidden': 'true' }, h('span', { class: 'ring-big' }, big), small ? h('span', { class: 'ring-small' }, small) : null),
+  );
+}
+
+export const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 export function formatTime(iso, timeZone) {
   return new Intl.DateTimeFormat('en-IN', { timeZone, hour: 'numeric', minute: '2-digit' }).format(new Date(iso));
