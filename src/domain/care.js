@@ -45,6 +45,7 @@ export function dosesOn(circle, date, now) {
       const log = circle.doses[key];
       doses.push({
         key,
+        date,
         medId: med.id,
         name: med.name,
         dosage: med.dosage,
@@ -122,7 +123,7 @@ export function consecutiveMisses(circle, medId, now) {
   let misses = 0;
   for (const dose of recent) {
     if (dose.status === 'taken') break;
-    misses += 1;
+    if (dose.status === 'missed') misses += 1;
   }
   return misses;
 }
