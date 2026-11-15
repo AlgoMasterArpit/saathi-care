@@ -11,7 +11,7 @@
     "start": "node src/server.js",
     "dev": "node --env-file-if-exists=.env --watch src/server.js",
     "test": "node --test --test-reporter=spec",
-    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/**",
+    "test:coverage": "node --test --experimental-test-coverage --test-coverage-include=src/** --test-coverage-include=public/js/**",
     "lint": "eslint ."
   },
   "license": "MIT",
