@@ -2,15 +2,16 @@ import { api, handleUnauthorized, session } from './api.js';
 import { renderAppointments, renderMedicines, renderToday } from './care.js';
 import { renderActivity, renderCircle, renderInsights } from './circle.js';
 import { clear, h, loadPrefs, savePrefs, toast } from './dom.js';
+import { icon } from './icons.js';
 import { renderWelcome } from './welcome.js';
 
 const TABS = [
-  { id: 'today', label: 'Today', render: renderToday },
-  { id: 'medicines', label: 'Medicines', render: renderMedicines },
-  { id: 'appointments', label: 'Appointments', render: renderAppointments },
-  { id: 'insights', label: 'Insights', render: renderInsights },
-  { id: 'circle', label: 'Circle', render: renderCircle },
-  { id: 'activity', label: 'Activity', render: renderActivity },
+  { id: 'today', label: 'Today', short: 'Today', icon: 'sun', render: renderToday },
+  { id: 'medicines', label: 'Medicines', short: 'Meds', icon: 'pill', render: renderMedicines },
+  { id: 'appointments', label: 'Appointments', short: 'Visits', icon: 'calendar', render: renderAppointments },
+  { id: 'insights', label: 'Insights', short: 'Insights', icon: 'chart', render: renderInsights },
+  { id: 'circle', label: 'Circle', short: 'Circle', icon: 'users', render: renderCircle },
+  { id: 'activity', label: 'Activity', short: 'Activity', icon: 'bell', render: renderActivity },
 ];
 const ROLE_LABEL = { elder: 'Elder', caretaker: 'Caretaker', family: 'Family' };
 const REFRESH_MS = 60_000;
@@ -55,7 +56,13 @@ function buildTabs() {
   clear(
     tablist,
     TABS.map((tab) => {
-      const button = h('button', { type: 'button', role: 'tab', id: `tab-${tab.id}`, 'aria-controls': 'panel', class: 'tab' }, tab.label);
+      const button = h(
+        'button',
+        { type: 'button', role: 'tab', id: `tab-${tab.id}`, 'aria-controls': 'panel', class: 'tab' },
+        icon(tab.icon),
+        h('span', { class: 'tab-label' }, tab.label),
+        h('span', { class: 'tab-short' }, tab.short),
+      );
       button.addEventListener('click', () => go(tab.id));
       return button;
     }),
@@ -87,8 +94,8 @@ function renderHeader() {
     h(
       'div',
       { class: 'session-info' },
-      h('p', { class: 'session-circle' }, `${data.elder.name}'s circle · `, h('code', {}, data.code)),
-      h('p', { class: 'session-me' }, data.me.name, ' ', h('span', { class: `chip chip-${data.me.role}` }, ROLE_LABEL[data.me.role] ?? data.me.role)),
+      h('p', { class: 'session-circle' }, `${data.elder.name}'s circle `, h('span', { class: 'code-chip' }, icon('lock'), h('span', { class: 'visually-hidden' }, 'Circle code '), data.code)),
+      h('p', { class: 'session-me' }, h('span', { class: 'avatar avatar-sm', 'aria-hidden': 'true' }, data.me.name.slice(0, 1).toUpperCase()), data.me.name, ' ', h('span', { class: `chip chip-${data.me.role}` }, ROLE_LABEL[data.me.role] ?? data.me.role)),
     ),
     h('button', { type: 'button', class: 'btn btn-ghost', onclick: signOut }, 'Sign out'),
   );
@@ -131,8 +138,21 @@ function startPolling() {
   }, REFRESH_MS);
 }
 
+function skeleton() {
+  const block = (cls) => h('div', { class: `skeleton ${cls}`, 'aria-hidden': 'true' });
+  return h(
+    'div',
+    { class: 'skeleton-wrap', role: 'status' },
+    h('span', { class: 'visually-hidden' }, 'Loading your circle…'),
+    block('sk-title'),
+    block('sk-line'),
+    h('div', { class: 'today-grid' }, block('sk-card'), block('sk-card'), block('sk-card')),
+    block('sk-list'),
+  );
+}
+
 async function showApp() {
-  main.replaceChildren(h('p', { class: 'loading', role: 'status' }, 'Loading your circle…'));
+  main.replaceChildren(skeleton());
   try {
     state.data = await api.circle();
   } catch (error) {
