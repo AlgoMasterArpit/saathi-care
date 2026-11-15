@@ -11,6 +11,7 @@ const KIND_LABEL = {
   'appointment-tomorrow': 'Appointment tomorrow',
   'appointment-soon': 'Appointment soon',
   'refill-low': 'Refill reminder',
+  'approval-needed': 'Approval request',
   test: 'Test email',
 };
 
