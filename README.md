@@ -15,6 +15,10 @@
 
 Built for **PromptWars × Catalyst** (Hack2skill) on 15 Nov 2026.
 
+<img src="docs/today.png" alt="Kamla Devi's Today screen: a 'Waiting for your decision' card asking her to approve Vitamin B12 proposed by her daughter, a 2 of 4 doses taken ring, a Care Pulse showing 90% adherence with an alert that Atorvastatin was missed twice in a row, and her next appointment with an endocrinologist" width="100%">
+
+<sub>The elder's home screen. Her daughter proposed a new medicine, and nothing changes until Kamla taps Approve. Care Pulse has already noticed two missed Atorvastatin doses and a refill running low.</sub>
+
 </div>
 
 ---
@@ -95,7 +99,7 @@ The demo circle has a week of realistic history: two missed Atorvastatin doses i
 | --- | --- |
 | **Code quality** | Layered design: pure domain functions (`src/domain`), thin HTTP layer (`src/routes`), swappable stores (`src/store`) and services injected into `createApp`. ESLint flat config, no dead code, small modules, self-describing names, and no framework or build step on the frontend |
 | **Security** | Per-member scrypt passcodes with a random salt and constant-time compare. HMAC-SHA256 session tokens with expiry, and revocation that takes effect on the next request. A strict Helmet CSP (`script-src 'self'`, no inline code), HSTS, `frame-ancestors 'none'` and Permissions-Policy. Zod `.strict()` validation on every payload rejects unknown fields. Rate limits on sign-in, AI and email. Role checks in the domain layer, not only in the UI. No passcode hash ever leaves the server. Generic sign-in errors (no circle enumeration). Body limits (100 KB, 6 MB for scans only). The DOM is built with `textContent` only. The container runs as non-root, and the demo circle cannot send email |
-| **Efficiency** | One Firestore document per circle, so a dashboard is **one read** and a change is **one transactional write**. Dose history is capped at 90 days and the audit and outbox logs are capped. `Intl.DateTimeFormat` instances are cached per timezone. gzip compression, cache headers on static assets, and a framework-free ~60 KB frontend with zero client dependencies. The reminder runner reuses the in-flight tick, so concurrent triggers never double-send. Gemini falls back to a second model on failure |
+| **Efficiency** | One Firestore document per circle, so a dashboard is **one read** and a change is **one transactional write**. Dose history is capped at 90 days and the audit and outbox logs are capped. `Intl.DateTimeFormat` instances are cached per timezone. gzip compression, ETag revalidation for static assets, and a framework-free frontend (~29 KB gzipped, zero client dependencies, no build step). The reminder runner reuses the in-flight tick, so concurrent triggers never double-send. Gemini falls back to a second model on failure |
 | **Testing** | **66 tests, 97% line and 91% branch coverage** with Node's built-in runner (`npm run test:coverage`). They cover timezone and DST maths, token tampering, adherence, streaks, refills, the escalation ladder, approval flows, role permissions, scheduler de-duplication, demo email safety, mailer escaping, config parsing, Gemini fallback and output validation, and a full HTTP integration suite. CI runs lint, tests and `npm audit` on Node 22 and 24 |
 | **Accessibility** | Semantic landmarks, a skip link, labelled inputs with linked hints and errors, `aria-live` announcements, focus moved to the heading on every view change, ARIA tabs with arrow-key support, native `<dialog>`, status shown by icon **and** text (never colour alone), WCAG AA contrast, a high-contrast theme, three text sizes, `prefers-reduced-motion`, read-aloud, and a print stylesheet for the emergency card |
 | **Google services** | Gemini API through the official `@google/genai` SDK (structured output, vision and multilingual), Cloud Firestore (transactions), Gmail (SMTP with an app password), Google Calendar and Google Maps deep links, Google Fonts, and logs in the Cloud Logging JSON format with a Cloud Run-ready container. [Details below](#google-services) |
@@ -186,6 +190,8 @@ Each reminder has a stable key (for example `miss:med_x@2026-11-15T21:30`) recor
 - **AI safety.** Gemini never decides anything. The Care Pulse and the reminders are deterministic code, and Gemini output only pre-fills forms for a person to review.
 
 ## Accessibility
+
+<p align="center"><img src="docs/mobile.png" alt="Saathi on a phone: large text, an Approve / Decline card, and a bottom tab bar with Today, Meds, Visits, Insights, Circle and Activity" width="300"></p>
 
 Designed and checked for **WCAG 2.2 AA**: keyboard-only use from end to end, visible focus rings, the 44 px minimum target size, text resizable to 150% without horizontal scroll at 360 px, colour plus icon plus text for every status, `lang` attributes for Hindi output, and reduced-motion support. Elders can listen to their day instead of reading it.
 
