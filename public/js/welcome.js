@@ -1,5 +1,6 @@
 import { api, session } from './api.js';
-import { busy, field, formError, h, toast, validateForm } from './dom.js';
+import { busy, field, formError, h, prefersReducedMotion, ring, toast, validateForm } from './dom.js';
+import { icon } from './icons.js';
 
 const DEMO = {
   code: 'SA-DEMO42',
@@ -116,40 +117,89 @@ export function renderWelcome(container, onSignedIn) {
       return h(
         'li',
         { class: 'demo-person' },
-        h('p', { class: 'demo-name' }, person.name, ' ', h('span', { class: 'chip' }, person.role)),
+        h('div', { class: 'demo-who' }, h('span', { class: 'avatar', 'aria-hidden': 'true' }, person.name.slice(0, 1)), h('p', { class: 'demo-name' }, person.name, ' ', h('span', { class: 'chip' }, person.role))),
         h('p', { class: 'muted' }, 'Passcode ', h('code', {}, person.passcode)),
         button,
       );
     }),
   );
 
+  const jump = (target) => {
+    target.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+    target.querySelector('button, input')?.focus({ preventScroll: true });
+  };
+  const demoSection = h(
+    'section',
+    { class: 'card demo-card', 'aria-labelledby': 'demo-title' },
+    h('div', { class: 'demo-head' }, h('h2', { id: 'demo-title' }, 'Try the live demo'), h('p', {}, 'Circle code ', h('code', {}, DEMO.code), ' — see the same circle through three different people.')),
+    demoList,
+  );
+  const forms = h('div', { class: 'two-col' }, createForm, joinForm);
+
+  const previewDose = (time, name, status, label) =>
+    h('li', { class: `pv-dose pv-${status}` }, h('span', { class: 'pv-time' }, time), h('span', { class: 'pv-name' }, name), h('span', { class: `badge badge-${status}` }, icon(status === 'taken' ? 'check' : status === 'due' ? 'clock' : 'circle'), label));
+
+  const preview = h(
+    'div',
+    { class: 'preview', role: 'img', 'aria-label': "Preview of Saathi's Today screen: 2 of 3 medicines taken, Care Pulse all steady" },
+    h(
+      'div',
+      { class: 'preview-card', 'aria-hidden': 'true' },
+      h('div', { class: 'pv-head' }, h('span', { class: 'avatar' }, 'K'), h('div', {}, h('p', { class: 'pv-hello' }, 'Good morning, Kamla'), h('p', { class: 'pv-sub' }, 'Thursday · 3 medicines today'))),
+      h(
+        'div',
+        { class: 'pv-stats' },
+        ring(67, { label: '', big: '2/3', small: 'taken', size: 92, stroke: 9 }),
+        h('div', { class: 'pv-pulse' }, h('p', { class: 'pulse-level tone-ok' }, icon('leaf'), 'All steady'), h('p', { class: 'pv-sub' }, icon('heart'), '12 day streak')),
+      ),
+      h('ul', { class: 'pv-doses' }, previewDose('8:30 AM', 'Metformin 500 mg', 'taken', 'Taken'), previewDose('9:00 AM', 'Amlodipine 5 mg', 'taken', 'Taken'), previewDose('1:30 PM', 'Calcium + D3', 'due', 'Due now')),
+    ),
+    h('p', { class: 'pv-float pv-float-a', 'aria-hidden': 'true' }, icon('mail'), 'Priya was notified'),
+    h('p', { class: 'pv-float pv-float-b', 'aria-hidden': 'true' }, icon('shield'), 'Kamla approved B12'),
+  );
+
+  const FEATURES = [
+    ['pill', 'One-tap Today view', 'Big, clear dose cards. Tap Taken and the whole circle knows, instantly.'],
+    ['mail', 'Kind escalation emails', 'A nudge before each dose, a note if one is missed, family looped in after repeated misses.'],
+    ['camera', 'Scan with Gemini', 'Photograph a prescription or describe a medicine. You review before anything is saved.'],
+    ['shield', 'Elder approves changes', 'Family and caretakers can propose. Only the elder says yes. Every action is logged.'],
+  ];
+  const TRUST = [
+    ['lock', 'Passcode per person'],
+    ['shield', 'Elder approves every change'],
+    ['mail', 'Kind escalation emails'],
+    ['sparkles', 'Gemini helps, never prescribes'],
+  ];
+
+  const heroDemoBtn = h('button', { type: 'button', class: 'btn btn-primary btn-lg', onclick: () => jump(demoSection) }, 'Try the live demo', icon('arrow'));
+  const heroStartBtn = h('button', { type: 'button', class: 'btn btn-secondary btn-lg', onclick: () => jump(createForm) }, 'Start a care circle');
+
   container.replaceChildren(
     h(
       'section',
       { class: 'hero', 'aria-labelledby': 'hero-title' },
-      h('p', { class: 'eyebrow' }, 'Saathi · साथी · companion'),
-      h('h1', { id: 'hero-title', tabindex: '-1' }, 'Care that keeps the elder in charge'),
       h(
-        'p',
-        { class: 'lead' },
-        'One shared circle for medicines, doctor visits and daily routines. Gentle email reminders, family kept in the loop, and nothing changes without the elder saying yes.',
+        'div',
+        { class: 'hero-copy' },
+        h('p', { class: 'eyebrow' }, 'Saathi · ', h('span', { lang: 'hi' }, 'साथी'), ' · companion'),
+        h('h1', { id: 'hero-title', tabindex: '-1' }, 'Care that keeps the elder ', h('span', { class: 'accent' }, 'in charge')),
+        h(
+          'p',
+          { class: 'lead' },
+          'One shared circle for medicines, doctor visits and daily routines. Gentle email reminders, family kept in the loop, and nothing changes without the elder saying yes.',
+        ),
+        h('div', { class: 'hero-cta' }, heroDemoBtn, heroStartBtn),
       ),
-      h(
-        'ul',
-        { class: 'feature-list' },
-        h('li', {}, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, '💊'), 'Today view with one-tap “Taken”'),
-        h('li', {}, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, '✉️'), 'Email reminders that escalate kindly'),
-        h('li', {}, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, '📷'), 'Scan a prescription with Gemini'),
-        h('li', {}, h('span', { class: 'feature-icon', 'aria-hidden': 'true' }, '🛡️'), 'Elder approves every change'),
-      ),
+      preview,
     ),
+    h('ul', { class: 'trust-strip', 'aria-label': 'Why families trust Saathi' }, TRUST.map(([name, text]) => h('li', {}, icon(name), text))),
     h(
       'section',
-      { class: 'card demo-card', 'aria-labelledby': 'demo-title' },
-      h('h2', { id: 'demo-title' }, 'Try the live demo'),
-      h('p', {}, 'Circle code ', h('code', {}, DEMO.code), '. See the same circle through three different people.'),
-      demoList,
+      { class: 'features', 'aria-labelledby': 'features-title' },
+      h('h2', { id: 'features-title', class: 'visually-hidden' }, 'What Saathi does'),
+      h('ul', { class: 'feature-grid' }, FEATURES.map(([name, title, text]) => h('li', { class: 'feature' }, h('span', { class: 'feature-icon' }, icon(name)), h('h3', {}, title), h('p', { class: 'muted' }, text)))),
     ),
-    h('div', { class: 'two-col' }, createForm, joinForm),
+    demoSection,
+    forms,
   );
 }
