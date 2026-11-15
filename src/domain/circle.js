@@ -246,6 +246,10 @@ export function toView(circle, member, now, features) {
       refill: refillStatus(m),
     })),
     today: { date: today, doses: dosesOn(circle, today, now) },
+    earlier: [addDays(today, -1), addDays(today, -2)]
+      .flatMap((date) => dosesOn(circle, date, now))
+      .filter((dose) => dose.status === 'missed' || dose.status === 'skipped')
+      .sort((a, b) => b.dueAt.localeCompare(a.dueAt)),
     appointments: [...circle.appointments].sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
     pulse: carePulse(circle, now),
     adherence: adherence(circle, now, 7),
