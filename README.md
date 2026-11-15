@@ -5,7 +5,7 @@
 **A shared care circle where an elder's medicines, doctor visits and daily routine stay on track, family stays informed, and nothing changes without the elder saying yes.**
 
 [![CI](https://github.com/AlgoMasterArpit/saathi-care/actions/workflows/ci.yml/badge.svg)](https://github.com/AlgoMasterArpit/saathi-care/actions/workflows/ci.yml)
-![Tests](https://img.shields.io/badge/tests-66%20passing-0f6b5c)
+![Tests](https://img.shields.io/badge/tests-78%20passing-0f6b5c)
 ![Coverage](https://img.shields.io/badge/line%20coverage-97%25-0f6b5c)
 ![Node](https://img.shields.io/badge/node-%E2%89%A522.9-0f6b5c)
 ![Gemini](https://img.shields.io/badge/Google-Gemini%20%C2%B7%20Firestore%20%C2%B7%20Gmail-4285F4)
@@ -100,7 +100,7 @@ The demo circle has a week of realistic history: two missed Atorvastatin doses i
 | **Code quality** | Layered design: pure domain functions (`src/domain`), thin HTTP layer (`src/routes`), swappable stores (`src/store`) and services injected into `createApp`. ESLint flat config, no dead code, small modules, self-describing names, and no framework or build step on the frontend |
 | **Security** | Per-member scrypt passcodes with a random salt and constant-time compare. HMAC-SHA256 session tokens with expiry, and revocation that takes effect on the next request. A strict Helmet CSP (`script-src 'self'`, no inline code), HSTS, `frame-ancestors 'none'` and Permissions-Policy. Zod `.strict()` validation on every payload rejects unknown fields. Rate limits on sign-in, AI and email. Role checks in the domain layer, not only in the UI. No passcode hash ever leaves the server. Generic sign-in errors (no circle enumeration). Body limits (100 KB, 6 MB for scans only). The DOM is built with `textContent` only. The container runs as non-root, and the demo circle cannot send email |
 | **Efficiency** | One Firestore document per circle, so a dashboard is **one read** and a change is **one transactional write**. Dose history is capped at 90 days and the audit and outbox logs are capped. `Intl.DateTimeFormat` instances are cached per timezone. gzip compression, ETag revalidation for static assets, and a framework-free frontend (~29 KB gzipped, zero client dependencies, no build step). The reminder runner reuses the in-flight tick, so concurrent triggers never double-send. Gemini falls back to a second model on failure |
-| **Testing** | **66 tests, 97% line and 91% branch coverage** with Node's built-in runner (`npm run test:coverage`). They cover timezone and DST maths, token tampering, adherence, streaks, refills, the escalation ladder, approval flows, role permissions, scheduler de-duplication, demo email safety, mailer escaping, config parsing, Gemini fallback and output validation, and a full HTTP integration suite. CI runs lint, tests and `npm audit` on Node 22 and 24 |
+| **Testing** | **78 tests, 97% line and 91% branch coverage** (server and browser client) with Node's built-in runner (`npm run test:coverage`). They cover timezone and DST maths, token tampering, adherence, streaks, refills, the escalation ladder, approval flows, role permissions, scheduler de-duplication, demo email safety, mailer escaping, config parsing, Gemini fallback and output validation, and a full HTTP integration suite. CI runs lint, tests and `npm audit` on Node 22 and 24 |
 | **Accessibility** | Semantic landmarks, a skip link, labelled inputs with linked hints and errors, `aria-live` announcements, focus moved to the heading on every view change, ARIA tabs with arrow-key support, native `<dialog>`, status shown by icon **and** text (never colour alone), WCAG AA contrast, a high-contrast theme, three text sizes, `prefers-reduced-motion`, read-aloud, and a print stylesheet for the emergency card |
 | **Google services** | Gemini API through the official `@google/genai` SDK (structured output, vision and multilingual), Cloud Firestore (transactions), Gmail (SMTP with an app password), Google Calendar and Google Maps deep links, Google Fonts, and logs in the Cloud Logging JSON format with a Cloud Run-ready container. [Details below](#google-services) |
 | **Problem statement alignment** | Every sentence of the brief maps to a feature and a file in [What Saathi does](#what-saathi-does). The "elder at the centre" line drives the core design choice: the approval workflow |
@@ -167,8 +167,8 @@ Each reminder has a stable key (for example `miss:med_x@2026-11-15T21:30`) recor
 | **Gemini API** (`@google/genai`) | Free-text medicine to schedule, prescription and strip photo to medicines (vision), weekly care brief in English or Hindi. JSON-schema output with Zod re-validation, a safety system prompt, and automatic fallback to a second model | [`src/services/gemini.js`](src/services/gemini.js) |
 | **Cloud Firestore** | Persistent store. One document per circle, every change runs in a transaction, and `create()` guards against circle-code collisions | [`src/store/firestore.js`](src/store/firestore.js) |
 | **Gmail** | Reminder delivery over Gmail SMTP with an app password, as large-type HTML plus a plain-text alternative | [`src/services/mailer.js`](src/services/mailer.js) |
-| **Google Calendar** | One-tap "Add to Google Calendar" for every appointment | [`public/js/care.js`](public/js/care.js) |
-| **Google Maps** | "Open in Google Maps" directions for every clinic | [`public/js/care.js`](public/js/care.js) |
+| **Google Calendar** | One-tap "Add to Google Calendar" for every appointment, with the questions to ask in the event | [`public/js/format.js`](public/js/format.js) |
+| **Google Maps** | "Open in Google Maps" directions for every clinic | [`public/js/format.js`](public/js/format.js) |
 | **Google Fonts** | Atkinson Hyperlegible (low-vision legibility) and Noto Sans Devanagari (Hindi) | [`public/index.html`](public/index.html) |
 | **Cloud Logging / Cloud Run** | Structured JSON logs with `severity` and `httpRequest` fields. The non-root `Dockerfile` listens on `$PORT` and is ready for `gcloud run deploy` | [`src/lib/logger.js`](src/lib/logger.js), [`Dockerfile`](Dockerfile) |
 
@@ -200,7 +200,7 @@ Designed and checked for **WCAG 2.2 AA**: keyboard-only use from end to end, vis
 ## Testing
 
 ```bash
-npm test                # 66 tests, ~5 s, no network or database needed
+npm test                # 78 tests, ~5 s, no network or database needed
 npm run test:coverage   # line / branch / function coverage for src/**
 npm run lint
 ```
@@ -215,6 +215,8 @@ npm run lint
 | `scheduler.test.js` | Exactly-once delivery, demo-circle email safety, HTML escaping, SMTP failure |
 | `config.test.js` | Production secret guard, credential parsing, Gemini fallback and output rejection |
 | `api.test.js` | Full HTTP flow: create, invite, sign in, propose, approve, revoke, AI, cron auth, headers |
+| `client.test.js` | Browser client: bearer header, 401 sign-out, offline message, blocked storage, Calendar and Maps links, time formatting |
+| `demo.test.js` | Demo circle seeding and stale refresh |
 
 ## Run it locally
 
