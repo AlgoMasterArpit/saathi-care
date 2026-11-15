@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Saathi — care that keeps the elder in charge</title>
+    <meta name="description" content="Saathi is a shared care circle for elders, caretakers and family: medicines, appointments, adherence and gentle email reminders, with the elder at the centre of every decision.">
+    <meta name="theme-color" content="#0f6b5c">
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Noto+Sans+Devanagari:wght@400;600&display=swap">
+    <link rel="stylesheet" href="/css/styles.css">
+    <script type="module" src="/js/app.js"></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to main content</a>
+    <header class="site-header" id="site-header">
+      <div class="header-inner">
+        <a class="brand" href="/" aria-label="Saathi home">
+          <img src="/favicon.svg" alt="" width="40" height="40">
+          <span class="brand-name">Saathi</span>
+        </a>
+        <div class="header-session" id="header-session" hidden></div>
+        <div class="display-controls" role="group" aria-label="Display settings">
+          <span class="visually-hidden" id="text-size-label">Text size</span>
+          <div class="segmented" role="group" aria-labelledby="text-size-label">
+            <button type="button" class="size-btn" data-size="1" aria-pressed="true" aria-label="Normal text size">A</button>
+            <button type="button" class="size-btn size-lg" data-size="2" aria-pressed="false" aria-label="Large text size">A+</button>
+            <button type="button" class="size-btn size-xl" data-size="3" aria-pressed="false" aria-label="Extra large text size">A++</button>
+          </div>
+          <button type="button" class="btn btn-ghost" id="contrast-toggle" aria-pressed="false">High contrast</button>
+        </div>
+      </div>
+      <nav class="tabs-wrap" id="app-nav" aria-label="Sections" hidden>
+        <div class="tabs" role="tablist" aria-label="Saathi sections" id="tablist"></div>
+      </nav>
+    </header>
+    <main id="main" tabindex="-1"></main>
+    <footer class="site-footer">
+      <p>Saathi supports care routines and never gives medical advice. Always confirm medicine changes with a doctor or pharmacist.</p>
+    </footer>
+    <div class="toast-region" id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
+    <div id="print-root" class="print-root" aria-hidden="true"></div>
+  </body>
+</html>
