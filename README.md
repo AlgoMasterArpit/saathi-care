@@ -193,6 +193,8 @@ Each reminder has a stable key (for example `miss:med_x@2026-11-15T21:30`) recor
 
 <p align="center"><img src="docs/mobile.png" alt="Saathi on a phone: large text, an Approve / Decline card, and a bottom tab bar with Today, Meds, Visits, Insights, Circle and Activity" width="300"></p>
 
+**Audited with axe-core 4.14 (WCAG 2.0, 2.1 and 2.2 A/AA rules plus best practices): 0 violations** on the welcome page, all six app views and the medicine dialog. One duplicate-landmark finding on the Activity view was fixed and re-audited.
+
 Designed and checked for **WCAG 2.2 AA**: keyboard-only use from end to end, visible focus rings, the 44 px minimum target size, text resizable to 150% without horizontal scroll at 360 px, colour plus icon plus text for every status, `lang` attributes for Hindi output, and reduced-motion support. Elders can listen to their day instead of reading it.
 
 ## Testing
