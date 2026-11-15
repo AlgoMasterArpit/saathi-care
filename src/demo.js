@@ -44,6 +44,7 @@ export async function buildDemoCircle(now) {
     now: created,
   });
   circle.demo = true;
+  circle.seededAt = now.toISOString();
   circle.members.push(
     { id: 'mem_ravi', name: 'Ravi Kumar', email: 'ravi.nurse@example.com', role: 'caretaker', passcodeHash: caretakerHash, notify: true, createdAt: created.toISOString() },
     { id: 'mem_priya', name: 'Priya Sharma', email: 'priya@example.com', role: 'family', passcodeHash: familyHash, notify: true, createdAt: created.toISOString() },
@@ -146,7 +147,14 @@ export async function buildDemoCircle(now) {
   return circle;
 }
 
-export async function seedDemo(store, now = new Date()) {
-  if (await store.get(DEMO_CODE)) return false;
-  return store.create(await buildDemoCircle(now));
+export async function seedDemo(store, now = new Date(), maxAgeMs = 6 * HOUR) {
+  const existing = await store.get(DEMO_CODE);
+  if (existing && now.getTime() - Date.parse(existing.seededAt ?? 0) < maxAgeMs) return false;
+  const fresh = await buildDemoCircle(now);
+  if (!existing) return store.create(fresh);
+  await store.update(DEMO_CODE, (draft) => {
+    for (const key of Object.keys(draft)) delete draft[key];
+    Object.assign(draft, fresh);
+  });
+  return true;
 }
