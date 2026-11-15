@@ -365,6 +365,10 @@ function openMedicationDialog(data, ctx, initial, id) {
   openDialog({ title: id ? `Edit ${initial.name}` : 'Add a medicine', content: medicationForm(data, ctx, initial, id) });
 }
 
+const SCAN_MAX_EDGE = 1600;
+const SCAN_RAW_LIMIT = 4 * 1024 * 1024;
+const SCAN_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
 function readFileBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -372,6 +376,24 @@ function readFileBase64(file) {
     reader.onerror = () => reject(new Error('Could not read that file.'));
     reader.readAsDataURL(file);
   });
+}
+
+async function prepareScanImage(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const scale = Math.min(1, SCAN_MAX_EDGE / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    bitmap.close?.();
+    const blob = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+    if (!blob) throw new Error('encode failed');
+    return { image: await readFileBase64(blob), mimeType: 'image/jpeg' };
+  } catch {
+    if (file.size > SCAN_RAW_LIMIT) throw new Error('This photo could not be processed. Please try a JPG or PNG photo.');
+    return { image: await readFileBase64(file), mimeType: SCAN_TYPES.includes(file.type) ? file.type : 'image/jpeg' };
+  }
 }
 
 function aiPanel(data, ctx) {
@@ -399,18 +421,26 @@ function aiPanel(data, ctx) {
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
     if (!file) return;
-    if (file.size > 4 * 1024 * 1024) {
-      toast('Please choose a photo under 4 MB');
+    if (!file.type.startsWith('image/') && file.type !== '') {
+      toast('Please choose a photo of the prescription or medicine strip');
       fileInput.value = '';
       return;
     }
     results.replaceChildren(h('p', { class: 'muted' }, 'Reading the prescription with Gemini…'));
     results.setAttribute('aria-busy', 'true');
     try {
-      const image = await readFileBase64(file);
-      const scan = await api.aiScan(image, file.type || 'image/jpeg');
+      const { image, mimeType } = await prepareScanImage(file);
+      const scan = await api.aiScan(image, mimeType);
+      if (!scan.medications.length) {
+        results.replaceChildren(
+          h('h3', {}, 'No medicines found in this photo'),
+          scan.notes ? h('p', { class: 'muted' }, scan.notes) : null,
+          h('p', { class: 'notice' }, 'Try a clear, well-lit photo of the prescription or the medicine strip, or describe the medicine in the box on the left.'),
+        );
+        return;
+      }
       results.replaceChildren(
-        h('h3', {}, scan.medications.length ? `Found ${scan.medications.length} medicine(s)` : 'No medicines found'),
+        h('h3', {}, `Found ${scan.medications.length} medicine(s)`),
         scan.doctor ? h('p', {}, 'Prescribed by ', scan.doctor) : null,
         scan.notes ? h('p', { class: 'notice' }, h('strong', {}, 'Please double-check: '), scan.notes) : null,
         h(
