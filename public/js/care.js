@@ -11,28 +11,68 @@ import {
   h,
   nextId,
   openDialog,
+  prefersReducedMotion,
+  ring,
   toast,
   validateForm,
 } from './dom.js';
+import { icon } from './icons.js';
 
 const STATUS = {
-  taken: { icon: '✓', label: 'Taken' },
-  skipped: { icon: '–', label: 'Skipped' },
-  missed: { icon: '!', label: 'Missed' },
-  due: { icon: '⏰', label: 'Due now' },
-  upcoming: { icon: '○', label: 'Upcoming' },
+  taken: { icon: 'check', label: 'Taken' },
+  skipped: { icon: 'minus', label: 'Skipped' },
+  missed: { icon: 'alert', label: 'Missed' },
+  due: { icon: 'clock', label: 'Due now' },
+  upcoming: { icon: 'circle', label: 'Upcoming' },
 };
 
 const PULSE = {
-  steady: { label: 'All steady', icon: '🌿' },
-  watch: { label: 'Keep an eye', icon: '👀' },
-  act: { label: 'Needs attention', icon: '⚠️' },
+  steady: { label: 'All steady', icon: 'leaf', tone: 'ok' },
+  watch: { label: 'Keep an eye', icon: 'eye', tone: 'warn' },
+  act: { label: 'Needs attention', icon: 'alert', tone: 'danger' },
 };
 
 export function statusBadge(status) {
   const meta = STATUS[status] ?? STATUS.upcoming;
-  return h('span', { class: `badge badge-${status}` }, h('span', { 'aria-hidden': 'true' }, meta.icon), ' ', meta.label);
+  return h('span', { class: `badge badge-${status}` }, icon(meta.icon), meta.label);
 }
+
+const FIELD_LABEL = { name: 'name', dosage: 'strength', instructions: 'instructions', perDose: 'units per dose', stock: 'stock' };
+
+export function describeProposal(med) {
+  if (med.status === 'pending') return `${med.createdByName ?? 'Someone'} wants to add this · ${med.times.map(clock12).join(', ')} · ${describeDays(med.days)}`;
+  if (med.proposal.type === 'remove') return `${med.proposal.byName} proposes stopping this medicine`;
+  const changes = Object.entries(med.proposal.patch ?? {}).map(([key, value]) => {
+    if (key === 'times') return `times → ${value.map(clock12).join(', ')}`;
+    if (key === 'days') return `days → ${describeDays(value)}`;
+    return `${FIELD_LABEL[key] ?? key} → ${value === null || value === '' ? 'none' : value}`;
+  });
+  return `${med.proposal.byName} proposes: ${changes.join('; ') || 'a change'}`;
+}
+
+export function decisionButtons(med, ctx) {
+  const approve = h('button', { type: 'button', class: 'btn btn-primary', 'aria-label': `Approve ${med.name}` }, icon('check'), 'Approve');
+  const decline = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-label': `Decline ${med.name}` }, icon('x'), 'Decline');
+  approve.addEventListener('click', () => run(approve, async () => {
+    await api.decide(med.id, true);
+    await ctx.refresh();
+  }, `${med.name} approved`));
+  decline.addEventListener('click', () => run(decline, async () => {
+    await api.decide(med.id, false);
+    await ctx.refresh();
+  }, `${med.name} declined`));
+  return [approve, decline];
+}
+
+function untilText(ms) {
+  const minutes = Math.max(1, Math.round(ms / 60_000));
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest ? `${hours} h ${rest} m` : `${hours} h`;
+}
+
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function viewHeading(title, subtitle) {
   return h('div', { class: 'view-head' }, h('h1', { tabindex: '-1', class: 'view-title' }, title), subtitle ? h('p', { class: 'muted' }, subtitle) : null);
@@ -76,33 +116,112 @@ function appointmentSummary(appointment, timeZone) {
   return h(
     'div',
     { class: 'appt-summary' },
-    h('p', { class: 'appt-when' }, formatDateTime(appointment.startsAt, timeZone)),
+    h('p', { class: 'appt-when' }, icon('calendar'), formatDateTime(appointment.startsAt, timeZone)),
     h('p', { class: 'appt-doctor' }, appointment.doctor, appointment.specialty ? ` · ${appointment.specialty}` : ''),
-    appointment.location ? h('p', { class: 'muted' }, appointment.location) : null,
+    appointment.location ? h('p', { class: 'muted appt-loc' }, icon('pin'), appointment.location) : null,
+  );
+}
+
+function decisionsCard(data, ctx) {
+  const waiting = data.medications.filter((m) => m.status === 'pending' || m.proposal);
+  if (!waiting.length) return null;
+  return h(
+    'section',
+    { class: 'card decisions', 'aria-labelledby': 'decisions-title' },
+    h(
+      'div',
+      { class: 'decisions-head' },
+      h('span', { class: 'decisions-icon' }, icon('shield')),
+      h('div', {}, h('h2', { id: 'decisions-title' }, 'Waiting for your decision'), h('p', { class: 'muted' }, 'Nothing changes on your list until you say yes.')),
+    ),
+    h(
+      'ul',
+      { class: 'decision-list' },
+      waiting.map((med) =>
+        h(
+          'li',
+          { class: 'decision' },
+          h('div', { class: 'decision-main' }, h('p', { class: 'dose-name' }, med.name, ' ', h('span', { class: 'dose-dosage' }, med.dosage)), h('p', { class: 'muted' }, describeProposal(med))),
+          h('div', { class: 'dose-actions' }, decisionButtons(med, ctx)),
+        ),
+      ),
+    ),
+  );
+}
+
+function progressCard(data) {
+  const { doses } = data.today;
+  const taken = doses.filter((d) => d.status === 'taken').length;
+  const total = doses.length;
+  const next = doses.find((d) => d.status === 'due' || d.status === 'upcoming');
+  const missed = doses.filter((d) => d.status === 'missed').length;
+  let nextLine;
+  if (!total) nextLine = 'No medicines scheduled today.';
+  else if (!next) nextLine = taken === total ? 'All done for today. Well done!' : 'No more doses scheduled today.';
+  else if (next.status === 'due') nextLine = `${next.name} is due now`;
+  else nextLine = `Next: ${next.name} in ${untilText(Date.parse(next.dueAt) - Date.now())}`;
+  const readAloud = 'speechSynthesis' in window ? h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => speakDay(data) }, icon('speaker'), 'Read my day aloud') : null;
+  return h(
+    'section',
+    { class: 'card progress-card', 'aria-labelledby': 'progress-title' },
+    h('h2', { id: 'progress-title' }, 'Today so far'),
+    h(
+      'div',
+      { class: 'progress-body' },
+      ring(total ? (taken / total) * 100 : 0, { label: `${taken} of ${total} medicines taken today`, big: `${taken}/${total}`, small: 'taken', tone: missed ? 'warn' : 'ok' }),
+      h(
+        'div',
+        { class: 'progress-text' },
+        h('p', { class: 'next-line' }, icon('clock'), h('span', {}, nextLine)),
+        missed ? h('p', { class: 'missed-line' }, icon('alert'), h('span', {}, `${missed} missed earlier today`)) : null,
+      ),
+    ),
+    readAloud,
+  );
+}
+
+function pulseCard(pulse) {
+  const meta = PULSE[pulse.level] ?? PULSE.steady;
+  return h(
+    'section',
+    { class: `card pulse pulse-${pulse.level}`, 'aria-labelledby': 'pulse-title' },
+    h('h2', { id: 'pulse-title' }, 'Care Pulse'),
+    h(
+      'div',
+      { class: 'pulse-body' },
+      ring(pulse.adherence, {
+        label: pulse.adherence === null ? 'No doses recorded this week' : `${pulse.adherence}% of doses taken this week`,
+        big: pulse.adherence === null ? '—' : `${pulse.adherence}%`,
+        small: 'this week',
+        size: 104,
+        stroke: 10,
+        tone: meta.tone,
+      }),
+      h(
+        'div',
+        {},
+        h('p', { class: `pulse-level tone-${meta.tone}` }, icon(meta.icon), meta.label),
+        h('p', { class: 'muted streak' }, icon('heart'), `${pulse.streak} ${pulse.streak === 1 ? 'day' : 'days'} streak`),
+      ),
+    ),
+    pulse.signals.length
+      ? h('ul', { class: 'signals' }, pulse.signals.map((s) => h('li', { class: `signal signal-${s.severity}` }, icon(s.severity === 'act' ? 'alert' : s.severity === 'watch' ? 'eye' : 'bell'), h('span', {}, s.message))))
+      : h('p', { class: 'muted' }, 'Nothing needs attention right now.'),
   );
 }
 
 export function renderToday(data, ctx) {
-  const { elder, me, pulse, today } = data;
+  const { elder, me, pulse, today, settings } = data;
   const tz = elder.timezone;
-  const pulseMeta = PULSE[pulse.level] ?? PULSE.steady;
   const isElder = me.role === 'elder';
 
   const doseItems = today.doses.map((dose) => {
-    const takeBtn = h('button', { type: 'button', class: 'btn btn-take', 'aria-pressed': String(dose.status === 'taken'), 'data-key': `take-${dose.key}` }, '✓ Taken');
+    const takeBtn = h('button', { type: 'button', class: 'btn btn-take', 'aria-pressed': String(dose.status === 'taken'), 'data-key': `take-${dose.key}` }, icon('check'), 'Taken');
     const skipBtn = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-pressed': String(dose.status === 'skipped'), 'data-key': `skip-${dose.key}` }, 'Skip');
     const label = `${dose.name} at ${clock12(dose.time)}`;
     takeBtn.setAttribute('aria-label', `Mark ${label} as taken`);
     skipBtn.setAttribute('aria-label', `Mark ${label} as skipped`);
-    takeBtn.addEventListener('click', () => run(takeBtn, async () => {
-      await api.logDose(dose.key, 'taken');
-      await ctx.refresh();
-    }, `${dose.name} marked as taken`));
-    skipBtn.addEventListener('click', () => run(skipBtn, async () => {
-      await api.logDose(dose.key, 'skipped');
-      await ctx.refresh();
-    }, `${dose.name} marked as skipped`));
-    return h(
+    const item = h(
       'li',
       { class: `dose dose-${dose.status}` },
       h('p', { class: 'dose-time' }, clock12(dose.time)),
@@ -120,10 +239,22 @@ export function renderToday(data, ctx) {
       ),
       h('div', { class: 'dose-actions' }, takeBtn, skipBtn),
     );
+    takeBtn.addEventListener('click', () => run(takeBtn, async () => {
+      await api.logDose(dose.key, 'taken');
+      if (dose.status !== 'taken' && !prefersReducedMotion()) {
+        item.classList.add('dose-celebrate');
+        await wait(650);
+      }
+      await ctx.refresh();
+    }, `${dose.name} marked as taken`));
+    skipBtn.addEventListener('click', () => run(skipBtn, async () => {
+      await api.logDose(dose.key, 'skipped');
+      await ctx.refresh();
+    }, `${dose.name} marked as skipped`));
+    return item;
   });
 
   const next = data.appointments.find((a) => Date.parse(a.startsAt) > Date.now());
-  const readAloud = 'speechSynthesis' in window ? h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => speakDay(data) }, '🔊 Read my day aloud') : null;
 
   return h(
     'div',
@@ -132,36 +263,25 @@ export function renderToday(data, ctx) {
       `${greeting(tz)}, ${elder.name}`,
       isElder ? "Here is your day. You're in charge — tap Taken when you've had a medicine." : `You're viewing ${elder.name}'s day as ${me.name}.`,
     ),
+    isElder ? decisionsCard(data, ctx) : null,
+    !isElder && settings.requireApproval ? h('p', { class: 'banner' }, icon('shield'), `Changes you make to medicines go to ${elder.name} for approval.`) : null,
     h(
       'div',
-      { class: 'grid-2' },
+      { class: 'today-grid' },
+      progressCard(data),
+      pulseCard(pulse),
       h(
         'section',
-        { class: `card pulse pulse-${pulse.level}`, 'aria-labelledby': 'pulse-title' },
-        h('h2', { id: 'pulse-title' }, 'Care Pulse'),
-        h('p', { class: 'pulse-level' }, h('span', { 'aria-hidden': 'true' }, pulseMeta.icon), ' ', pulseMeta.label),
-        h(
-          'dl',
-          { class: 'stats' },
-          h('div', {}, h('dt', {}, 'Taken this week'), h('dd', {}, pulse.adherence === null ? '—' : `${pulse.adherence}%`)),
-          h('div', {}, h('dt', {}, 'Streak'), h('dd', {}, `${pulse.streak} ${pulse.streak === 1 ? 'day' : 'days'}`)),
-        ),
-        pulse.signals.length
-          ? h('ul', { class: 'signals' }, pulse.signals.map((s) => h('li', { class: `signal signal-${s.severity}` }, s.message)))
-          : h('p', { class: 'muted' }, 'Nothing needs attention right now.'),
-      ),
-      h(
-        'section',
-        { class: 'card', 'aria-labelledby': 'next-appt-title' },
+        { class: 'card appt-next', 'aria-labelledby': 'next-appt-title' },
         h('h2', { id: 'next-appt-title' }, 'Next appointment'),
         next ? appointmentSummary(next, tz) : h('p', { class: 'muted' }, 'No upcoming appointments.'),
-        h('button', { type: 'button', class: 'btn btn-link', onclick: () => ctx.go('appointments') }, 'See all appointments'),
+        h('button', { type: 'button', class: 'btn btn-link', onclick: () => ctx.go('appointments') }, 'See all appointments', icon('arrow')),
       ),
     ),
     h(
       'section',
       { class: 'card', 'aria-labelledby': 'today-title' },
-      h('div', { class: 'section-head' }, h('h2', { id: 'today-title' }, "Today's medicines"), readAloud),
+      h('h2', { id: 'today-title' }, "Today's medicines"),
       doseItems.length ? h('ol', { class: 'dose-list' }, doseItems) : h('p', { class: 'muted' }, 'No medicines scheduled today.'),
     ),
   );
@@ -212,7 +332,7 @@ function medicationForm(data, ctx, initial = {}, id = null) {
       { class: 'fieldset' },
       h('legend', {}, 'Times each day'),
       timesList,
-      h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => addTimeRow().focus() }, '+ Add a time'),
+      h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => addTimeRow().focus() }, icon('plus'), 'Add a time'),
     ),
     h('fieldset', { class: 'fieldset' }, h('legend', {}, 'Days (leave all unticked for every day)'), h('div', { class: 'days' }, dayBoxes)),
     h('div', { class: 'grid-2' }, field({ label: 'Units per dose', input: perDose }), field({ label: 'Units in stock (optional)', input: stock, hint: 'Used to warn before it runs out.' })),
@@ -264,7 +384,7 @@ function readFileBase64(file) {
 function aiPanel(data, ctx) {
   const textId = nextId('ai-text');
   const text = h('textarea', { id: textId, rows: 3, maxlength: 500, placeholder: 'e.g. Amlodipine 5 mg once every morning after breakfast, 30 tablets left' });
-  const fillBtn = h('button', { type: 'button', class: 'btn btn-primary' }, '✨ Fill the form with Gemini');
+  const fillBtn = h('button', { type: 'button', class: 'btn btn-primary' }, icon('sparkles'), 'Fill the form with Gemini');
   fillBtn.addEventListener('click', async () => {
     if (!text.value.trim()) {
       text.focus();
@@ -340,24 +460,12 @@ function medicationCard(med, data, ctx) {
   if (med.proposal) {
     chips.push(h('span', { class: 'chip chip-warn' }, `${med.proposal.type === 'remove' ? 'Removal' : 'Change'} proposed by ${med.proposal.byName}`));
   }
-  if (med.refill?.low) chips.push(h('span', { class: 'chip chip-danger' }, `⚠ Refill soon · ${med.refill.daysLeft} day(s) left`));
+  if (med.refill?.low) chips.push(h('span', { class: 'chip chip-danger' }, icon('alert'), `Refill soon · ${med.refill.daysLeft} day(s) left`));
 
   const actions = [];
-  if ((med.status === 'pending' || med.proposal) && me.can.approve) {
-    const approve = h('button', { type: 'button', class: 'btn btn-primary' }, 'Approve');
-    const decline = h('button', { type: 'button', class: 'btn btn-secondary' }, 'Decline');
-    approve.addEventListener('click', () => run(approve, async () => {
-      await api.decide(med.id, true);
-      await ctx.refresh();
-    }, 'Approved'));
-    decline.addEventListener('click', () => run(decline, async () => {
-      await api.decide(med.id, false);
-      await ctx.refresh();
-    }, 'Declined'));
-    actions.push(approve, decline);
-  }
-  const edit = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-label': `Edit ${med.name}`, onclick: () => openMedicationDialog(data, ctx, med, med.id) }, 'Edit');
-  const remove = h('button', { type: 'button', class: 'btn btn-ghost danger', 'aria-label': `Remove ${med.name}` }, 'Remove');
+  if ((med.status === 'pending' || med.proposal) && me.can.approve) actions.push(...decisionButtons(med, ctx));
+  const edit = h('button', { type: 'button', class: 'btn btn-secondary', 'aria-label': `Edit ${med.name}`, onclick: () => openMedicationDialog(data, ctx, med, med.id) }, icon('edit'), 'Edit');
+  const remove = h('button', { type: 'button', class: 'btn btn-ghost danger', 'aria-label': `Remove ${med.name}` }, icon('trash'), 'Remove');
   remove.addEventListener('click', () => {
     if (!window.confirm(`Remove ${med.name}?`)) return;
     run(remove, async () => {
@@ -382,13 +490,13 @@ function medicationCard(med, data, ctx) {
 
 export function renderMedicines(data, ctx) {
   const { me, settings, elder, medications, features } = data;
-  const addBtn = h('button', { type: 'button', class: 'btn btn-primary', onclick: () => openMedicationDialog(data, ctx, {}, null) }, '+ Add medicine');
+  const addBtn = h('button', { type: 'button', class: 'btn btn-primary', onclick: () => openMedicationDialog(data, ctx, {}, null) }, icon('plus'), 'Add medicine');
   const needsApproval = me.role !== 'elder' && settings.requireApproval;
   return h(
     'div',
     { class: 'view' },
     h('div', { class: 'section-head' }, viewHeading('Medicines', `${medications.length} on ${elder.name}'s list`), addBtn),
-    needsApproval ? h('p', { class: 'notice' }, `Changes you make go to ${elder.name} for approval.`) : null,
+    needsApproval ? h('p', { class: 'banner' }, icon('shield'), `Changes you make go to ${elder.name} for approval.`) : null,
     features.ai ? aiPanel(data, ctx) : null,
     medications.length ? h('ul', { class: 'card-list' }, medications.map((m) => medicationCard(m, data, ctx))) : h('p', { class: 'card muted' }, 'No medicines yet. Add one to start the daily schedule.'),
   );
@@ -474,16 +582,16 @@ function appointmentCard(appointment, data, ctx, past) {
   });
   const links = [];
   if (appointment.location) {
-    links.push(h('a', { class: 'btn btn-link', href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appointment.location)}`, target: '_blank', rel: 'noopener noreferrer' }, '📍 Open in Google Maps', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
+    links.push(h('a', { class: 'btn btn-link', href: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(appointment.location)}`, target: '_blank', rel: 'noopener noreferrer' }, icon('pin'), 'Open in Google Maps', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
   }
   if (!past) {
-    links.push(h('a', { class: 'btn btn-link', href: calendarLink(appointment, data.elder.name), target: '_blank', rel: 'noopener noreferrer' }, '📅 Add to Google Calendar', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
+    links.push(h('a', { class: 'btn btn-link', href: calendarLink(appointment, data.elder.name), target: '_blank', rel: 'noopener noreferrer' }, icon('calendar'), 'Add to Google Calendar', h('span', { class: 'visually-hidden' }, ' (opens in a new tab)')));
   }
   return h(
     'li',
     { class: `card appt-card${past ? ' appt-past' : ''}` },
     h('h3', {}, appointment.doctor, appointment.specialty ? h('span', { class: 'muted' }, ` · ${appointment.specialty}`) : null),
-    h('p', { class: 'appt-when' }, h('span', { 'aria-hidden': 'true' }, '🗓 '), formatDateTime(appointment.startsAt, tz)),
+    h('p', { class: 'appt-when' }, icon('calendar'), formatDateTime(appointment.startsAt, tz)),
     appointment.location ? h('p', {}, appointment.location) : null,
     appointment.notes ? h('p', { class: 'muted' }, appointment.notes) : null,
     appointment.questions?.length ? h('div', {}, h('h4', {}, 'Questions to ask'), h('ul', { class: 'bullets' }, appointment.questions.map((q) => h('li', {}, q)))) : null,
@@ -496,7 +604,7 @@ export function renderAppointments(data, ctx) {
   const now = Date.now();
   const upcoming = data.appointments.filter((a) => Date.parse(a.startsAt) >= now);
   const past = data.appointments.filter((a) => Date.parse(a.startsAt) < now).reverse();
-  const addBtn = h('button', { type: 'button', class: 'btn btn-primary', onclick: () => openDialog({ title: 'Add an appointment', content: appointmentForm(ctx) }) }, '+ Add appointment');
+  const addBtn = h('button', { type: 'button', class: 'btn btn-primary', onclick: () => openDialog({ title: 'Add an appointment', content: appointmentForm(ctx) }) }, icon('plus'), 'Add appointment');
   return h(
     'div',
     { class: 'view' },
