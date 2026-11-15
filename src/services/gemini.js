@@ -8,21 +8,32 @@ When something is unclear, leave the field empty rather than guessing.
 Always use plain, warm, respectful language that keeps the elder in charge of their own care.`;
 
 const TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const PLACEHOLDER = /^(null|none|nil|n\/?a|unknown|not (stated|specified|mentioned)|-+)$/i;
+
+const blank = (value) => (value === null || value === undefined || (typeof value === 'string' && PLACEHOLDER.test(value.trim())) ? '' : value);
+const text = (max) => z.preprocess(blank, z.string().trim().max(max)).default('');
+const clockTime = z.preprocess((value) => (typeof value === 'string' && /^\d:\d\d$/.test(value.trim()) ? `0${value.trim()}` : value), z.string().regex(TIME));
 
 const medicationShape = z.object({
-  name: z.string().trim().min(1).max(80),
-  dosage: z.string().trim().max(40).default(''),
-  instructions: z.string().trim().max(200).default(''),
-  times: z.array(z.string().regex(TIME)).max(6).default([]),
+  name: z.preprocess(blank, z.string().trim().min(1).max(80)),
+  dosage: text(40),
+  instructions: text(200),
+  times: z.array(clockTime).max(6).default([]),
   days: z.array(z.number().int().min(0).max(6)).max(7).default([]),
   perDose: z.number().positive().max(10).default(1),
   stock: z.number().int().min(0).max(10000).nullable().default(null),
 });
 
 const scanShape = z.object({
-  medications: z.array(medicationShape).max(15),
-  doctor: z.string().max(80).default(''),
-  notes: z.string().max(400).default(''),
+  medications: z
+    .array(z.unknown())
+    .max(40)
+    .transform((items) => items.flatMap((item) => {
+      const parsed = medicationShape.safeParse(item);
+      return parsed.success ? [parsed.data] : [];
+    }).slice(0, 15)),
+  doctor: text(80),
+  notes: text(400),
 });
 
 const briefShape = z.object({
@@ -124,7 +135,7 @@ export function createGemini({ apiKey, model = 'gemini-3.5-flash', fallbackModel
             role: 'user',
             parts: [
               { inlineData: { data, mimeType } },
-              { text: 'Read this prescription or medicine label. List each medicine with its schedule. Flag anything hard to read in notes.' },
+              { text: 'Read this prescription or medicine label. List each medicine with its schedule. Flag anything hard to read in notes. If the image is not a prescription or medicine label, return an empty medications list, leave doctor empty, and say what the image shows in notes.' },
             ],
           },
         ],
