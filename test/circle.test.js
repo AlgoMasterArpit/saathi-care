@@ -76,6 +76,20 @@ describe('dose logging', () => {
     assert.equal(circle.medications[0].stock, 10);
   });
 
+  it('lets a forgotten dose from yesterday be marked taken later, fixing record and stock', () => {
+    const circle = makeCircle({ now, medications: [{ name: 'Statin', times: ['09:00'], stock: 10 }] });
+    const before = toView(circle, memberOf(circle, 'elder'), now, { ai: false, email: false });
+    const missed = before.earlier.find((dose) => dose.date === '2026-11-14');
+    assert.equal(missed.status, 'missed');
+    assert.ok(before.earlier.every((dose) => dose.date < '2026-11-15' && dose.date >= '2026-11-13'));
+
+    logDose(circle, memberOf(circle, 'elder'), missed.key, 'taken', now);
+    const after = toView(circle, memberOf(circle, 'elder'), now, { ai: false, email: false });
+    assert.equal(after.earlier.some((dose) => dose.key === missed.key), false);
+    assert.equal(circle.medications[0].stock, 9);
+    assert.equal(circle.activity[0].action, 'marked taken');
+  });
+
   it('rejects doses that are not on the schedule or too old', () => {
     const circle = makeCircle({ now, medications: [{ name: 'Statin', times: ['09:00'] }] });
     const elder = memberOf(circle, 'elder');

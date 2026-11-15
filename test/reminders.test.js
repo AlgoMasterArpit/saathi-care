@@ -26,6 +26,16 @@ describe('reminder planning', () => {
     assert.match(plans.find((p) => p.kind === 'dose-escalation').text, /does not give medical advice/);
   });
 
+  it('sends no missed-dose alarm for a dose skipped on purpose and does not count it toward escalation', () => {
+    const now = istDate('2026-11-15', '09:00');
+    const circle = makeCircle({ now, medications: [{ name: 'Statin', times: ['08:00'] }] });
+    circle.doses[doseKey('med_0', '2026-11-13', '08:00')] = { status: 'taken' };
+    circle.doses[doseKey('med_0', '2026-11-14', '08:00')] = { status: 'skipped' };
+    assert.deepEqual(kinds(planReminders(circle, now)), ['dose-missed']);
+    circle.doses[doseKey('med_0', '2026-11-15', '08:00')] = { status: 'skipped' };
+    assert.equal(planReminders(circle, now).length, 0);
+  });
+
   it('does not repeat a reminder that was already sent', () => {
     const now = istDate('2026-11-15', '09:00');
     const circle = makeCircle({ now, medications: [{ name: 'Statin', times: ['08:00'] }] });
