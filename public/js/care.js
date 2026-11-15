@@ -507,6 +507,9 @@ function medicationCard(med, data, ctx) {
     h('p', {}, describeDays(med.days), med.perDose && med.perDose !== 1 ? ` · ${med.perDose} per dose` : ''),
     med.instructions ? h('p', { class: 'muted' }, med.instructions) : null,
     med.refill && !med.refill.low ? h('p', { class: 'muted' }, `${med.refill.stock} in stock · about ${med.refill.daysLeft} days left`) : null,
+    (med.status === 'pending' || med.proposal) && !me.can.approve
+      ? h('p', { class: 'notice' }, icon('shield'), ` Waiting for ${elder.name} to approve. Her schedule stays the same until she says yes.`)
+      : null,
     h('div', { class: 'actions' }, actions),
   );
 }
