@@ -2251,3 +2251,28 @@ textarea[aria-invalid='true'] {
     font-size: 9pt;
   }
 }
+
+@media (max-width: 640px) {
+  .header-inner {
+    gap: 0.5rem 0.75rem;
+    padding: 0.5rem 1rem;
+  }
+
+  .brand {
+    font-size: 1.15em;
+  }
+
+  .header-session {
+    flex: 1 1 auto;
+    gap: 0.5rem;
+  }
+
+  .session-circle {
+    display: none;
+  }
+
+  .display-controls {
+    width: 100%;
+    justify-content: space-between;
+  }
+}
