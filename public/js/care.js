@@ -88,29 +88,66 @@ function greeting(timeZone) {
   return 'Good evening';
 }
 
-function speakDay(data) {
+function dayScript(data) {
+  const { elder, me } = data;
+  const isElder = me.role === 'elder';
+  const tz = elder.timezone;
   const pending = data.today.doses.filter((d) => d.status === 'upcoming' || d.status === 'due' || d.status === 'missed');
-  const parts = [`${greeting(data.elder.timezone)}, ${data.elder.name}.`];
-  const decisions = data.me.can.approve ? data.medications.filter((m) => m.status === 'pending' || m.proposal) : [];
+  const parts = [isElder ? `${greeting(tz)}, ${elder.name}.` : `${greeting(tz)}, ${me.name}. Here is ${elder.name}'s day.`];
+  const decisions = me.can.approve ? data.medications.filter((m) => m.status === 'pending' || m.proposal) : [];
   for (const med of decisions) {
     parts.push(med.status === 'pending'
       ? `${med.createdByName ?? 'Someone'} wants to add ${med.name} ${med.dosage}.`
       : `${med.proposal.byName} wants to ${med.proposal.type === 'remove' ? 'stop' : 'change'} ${med.name}.`);
   }
   if (decisions.length) parts.push('Press the green Approve button to say yes, or Decline to say no.');
+  const count = `${pending.length} ${pending.length === 1 ? 'medicine' : 'medicines'}`;
   if (pending.length) {
-    parts.push(`You have ${pending.length} ${pending.length === 1 ? 'medicine' : 'medicines'} still to take today.`);
+    parts.push(isElder ? `You have ${count} still to take today.` : `${elder.name} has ${count} still to take today.`);
     for (const dose of pending) parts.push(`${dose.name} ${dose.dosage} at ${clock12(dose.time)}.${dose.instructions ? ` ${dose.instructions}.` : ''}`);
   } else {
-    parts.push("All of today's medicines are done. Well done.");
+    parts.push(isElder ? "All of today's medicines are done. Well done." : `All of ${elder.name}'s medicines for today are done.`);
   }
   const next = data.appointments.find((a) => Date.parse(a.startsAt) > Date.now());
-  if (next) parts.push(`Your next appointment is with ${next.doctor} on ${formatDateTime(next.startsAt, data.elder.timezone)}.`);
-  const utterance = new SpeechSynthesisUtterance(parts.join(' '));
-  utterance.lang = 'en-IN';
-  utterance.rate = 0.9;
-  speechSynthesis.cancel();
-  speechSynthesis.speak(utterance);
+  if (next) parts.push(`${isElder ? 'Your' : `${elder.name}'s`} next appointment is with ${next.doctor} on ${formatDateTime(next.startsAt, tz)}.`);
+  return parts.join(' ');
+}
+
+let speakingButton = null;
+
+function showSpeaking(button, speaking, idleLabel) {
+  button.setAttribute('aria-pressed', String(speaking));
+  button.replaceChildren(icon(speaking ? 'stop' : 'speaker'), speaking ? 'Stop reading' : idleLabel);
+}
+
+function readAloudButton(data) {
+  if (!('speechSynthesis' in window)) return null;
+  const idleLabel = data.me.role === 'elder' ? 'Read my day aloud' : `Read ${data.elder.name}'s day aloud`;
+  const button = h('button', { type: 'button', class: 'btn btn-secondary' });
+  const speaking = speechSynthesis.speaking && speakingButton !== null;
+  showSpeaking(button, speaking, idleLabel);
+  if (speaking) speakingButton = button;
+  const finish = () => {
+    if (speakingButton) showSpeaking(speakingButton, false, idleLabel);
+    speakingButton = null;
+  };
+  button.addEventListener('click', () => {
+    if (speakingButton) {
+      speechSynthesis.cancel();
+      finish();
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(dayScript(data));
+    utterance.lang = 'en-IN';
+    utterance.rate = 0.9;
+    utterance.onend = finish;
+    utterance.onerror = finish;
+    speechSynthesis.cancel();
+    speakingButton = button;
+    showSpeaking(button, true, idleLabel);
+    speechSynthesis.speak(utterance);
+  });
+  return button;
 }
 
 function appointmentSummary(appointment, timeZone) {
@@ -161,7 +198,7 @@ function progressCard(data) {
   else if (!next) nextLine = taken === total ? 'All done for today. Well done!' : 'No more doses scheduled today.';
   else if (next.status === 'due') nextLine = `${next.name} is due now`;
   else nextLine = `Next: ${next.name} in ${untilText(Date.parse(next.dueAt) - Date.now())}`;
-  const readAloud = 'speechSynthesis' in window ? h('button', { type: 'button', class: 'btn btn-secondary', onclick: () => speakDay(data) }, icon('speaker'), 'Read my day aloud') : null;
+  const readAloud = readAloudButton(data);
   return h(
     'section',
     { class: 'card progress-card', 'aria-labelledby': 'progress-title' },
@@ -263,8 +300,8 @@ export function renderToday(data, ctx) {
     'div',
     { class: 'view' },
     viewHeading(
-      `${greeting(tz)}, ${elder.name}`,
-      isElder ? "Here is your day. You're in charge — tap Taken when you've had a medicine." : `You're viewing ${elder.name}'s day as ${me.name}.`,
+      `${greeting(tz)}, ${isElder ? elder.name : me.name}`,
+      isElder ? "Here is your day. You're in charge — tap Taken when you've had a medicine." : `Here is ${elder.name}'s day. You can mark doses and add appointments.`,
     ),
     isElder ? decisionsCard(data, ctx) : null,
     !isElder && settings.requireApproval ? h('p', { class: 'banner' }, icon('shield'), `Changes you make to medicines go to ${elder.name} for approval.`) : null,
