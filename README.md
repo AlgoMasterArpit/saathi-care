@@ -11,7 +11,7 @@
 ![Gemini](https://img.shields.io/badge/Google-Gemini%20%C2%B7%20Firestore%20%C2%B7%20Gmail-4285F4)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue)](LICENSE)
 
-**[Live app](#live-demo)** · **[Try the demo in 30 seconds](#try-it-in-30-seconds)** · **[How it meets each criterion](#how-saathi-meets-each-evaluation-criterion)** · **[Architecture](#architecture)**
+**[Live app](https://saathi-care-a324.onrender.com)** · **[Try the demo in 30 seconds](#try-it-in-30-seconds)** · **[How it meets each criterion](#how-saathi-meets-each-evaluation-criterion)** · **[Architecture](#architecture)**
 
 Built for **PromptWars × Catalyst** (Hack2skill) on 15 Nov 2026.
 
@@ -64,7 +64,7 @@ The challenge asks for a shared, passcode-secured ecosystem for elders, caretake
 
 ## Live demo
 
-The deployed URL is linked from the repository description. The demo circle is seeded automatically on every boot.
+**https://saathi-care-a324.onrender.com**. It runs on Render with Cloud Firestore and Gemini. The free instance sleeps when idle, so the first request can take about 30 seconds. The demo circle re-seeds itself every 6 hours, so its dates always look current.
 
 ## Try it in 30 seconds
 
@@ -294,6 +294,7 @@ test/                  node:test suites
 ## Limits
 
 - **Not a medical device.** Saathi does not give medical advice, check drug interactions or change doses. Gemini output is a draft for a person to confirm.
+- **Email delivery on the live instance is pending Gmail credentials.** The Gmail sender is implemented and tested (`test/scheduler.test.js`, `test/api.test.js`), but the hosted instance currently runs without `GMAIL_*` set. Every reminder is still planned, de-duplicated and listed in the in-app Notification log, and delivery starts as soon as the two variables are added. The app needs no code change.
 - **Email only.** SMS, WhatsApp and push notifications are natural next channels, but they are not built.
 - **Single-instance scheduler.** The in-process runner and the cron endpoint de-duplicate within one instance, and Firestore transactions keep writes safe. Many instances would need a distributed lock or Cloud Scheduler as the only trigger.
 - **Free-tier hosting** sleeps when idle. The GitHub Actions heartbeat wakes it every 10 minutes, so a reminder can arrive up to about 10 minutes late after a quiet period.
