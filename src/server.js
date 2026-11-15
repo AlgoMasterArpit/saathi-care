@@ -16,7 +16,10 @@ const mailer = createMailer({ ...config.gmail, appUrl: config.publicUrl, logger 
 const ai = createGemini({ ...config.gemini, logger });
 const runner = createReminderRunner({ store, mailer, logger });
 
-if (config.seedDemo) await seedDemo(store);
+if (config.seedDemo) {
+  await seedDemo(store);
+  setInterval(() => seedDemo(store).catch((error) => logger.error('demo refresh failed', { error: error.message })), 30 * 60_000).unref();
+}
 
 const app = createApp({ store, ai, mailer, config, runner, logger });
 const server = app.listen(config.port, () => {
