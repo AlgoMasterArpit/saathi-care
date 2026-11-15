@@ -1,0 +1,19 @@
+name: Reminder heartbeat
+
+on:
+  schedule:
+    - cron: '*/10 * * * *'
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    if: ${{ vars.SAATHI_URL != '' }}
+    steps:
+      - name: Trigger reminder tick
+        env:
+          SAATHI_URL: ${{ vars.SAATHI_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: curl --fail --silent --show-error --max-time 60 -X POST -H "x-cron-secret: $CRON_SECRET" "$SAATHI_URL/api/cron/tick"
