@@ -411,7 +411,7 @@ export function renderActivity(data) {
       data.outbox.length
         ? h(
             'div',
-            { class: 'table-scroll', tabindex: '0', role: 'region', 'aria-labelledby': 'outbox-title' },
+            { class: 'table-scroll', tabindex: '0', role: 'region', 'aria-label': 'Notification log table, scrollable' },
             h(
               'table',
               { class: 'data-table' },
