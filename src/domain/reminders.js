@@ -15,7 +15,7 @@ export function planReminders(circle, now) {
   const plans = [];
 
   const add = (key, kind, roles, subject, lines) => {
-    if (!circle.notified?.[key]) plans.push({ key, kind, roles, subject, text: lines.join('\n') });
+    if (!circle.notified?.[key]) plans.push({ key, kind, roles, subject, text: lines.filter((line) => line !== null).join('\n') });
   };
 
   for (const date of [addDays(today, -1), today]) {
