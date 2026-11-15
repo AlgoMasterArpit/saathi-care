@@ -90,6 +90,13 @@ function greeting(timeZone) {
 function speakDay(data) {
   const pending = data.today.doses.filter((d) => d.status === 'upcoming' || d.status === 'due' || d.status === 'missed');
   const parts = [`${greeting(data.elder.timezone)}, ${data.elder.name}.`];
+  const decisions = data.me.can.approve ? data.medications.filter((m) => m.status === 'pending' || m.proposal) : [];
+  for (const med of decisions) {
+    parts.push(med.status === 'pending'
+      ? `${med.createdByName ?? 'Someone'} wants to add ${med.name} ${med.dosage}.`
+      : `${med.proposal.byName} wants to ${med.proposal.type === 'remove' ? 'stop' : 'change'} ${med.name}.`);
+  }
+  if (decisions.length) parts.push('Press the green Approve button to say yes, or Decline to say no.');
   if (pending.length) {
     parts.push(`You have ${pending.length} ${pending.length === 1 ? 'medicine' : 'medicines'} still to take today.`);
     for (const dose of pending) parts.push(`${dose.name} ${dose.dosage} at ${clock12(dose.time)}.${dose.instructions ? ` ${dose.instructions}.` : ''}`);
