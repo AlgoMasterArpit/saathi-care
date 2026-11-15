@@ -1,0 +1,14 @@
+{
+  "name": "Saathi — care that keeps the elder in charge",
+  "short_name": "Saathi",
+  "description": "Shared care circle for elders, caretakers and family: medicines, appointments, adherence and gentle reminders.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f3ee",
+  "theme_color": "#0f6b5c",
+  "lang": "en-IN",
+  "icons": [
+    { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
