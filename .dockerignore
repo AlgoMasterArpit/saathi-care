@@ -1,0 +1,11 @@
+node_modules
+.git
+.github
+.env
+.env.*
+coverage
+test
+docs
+.playwright-mcp
+service-account*.json
+*.md
